@@ -11,14 +11,17 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 
 @Service
 public class LinkService {
     private static final Logger log = LoggerFactory.getLogger(LinkService.class);
     private final LinkRepository linkRepository;
+    private final RedisCacheService redisCacheService;
 
-    public LinkService(LinkRepository linkRepository) {
+    public LinkService(LinkRepository linkRepository, RedisCacheService redisCacheService) {
         this.linkRepository = linkRepository;
+        this.redisCacheService = redisCacheService;
     }
 
     public ShortLinkResponse createShortLink(CreateShortLinkRequest request) {
@@ -32,6 +35,13 @@ public class LinkService {
         // Use custom short code if provided, otherwise generate after saving
         if (request.getCustomShortCode() != null && !request.getCustomShortCode().trim().isEmpty()) {
             log.info("Using custom short code: {}", request.getCustomShortCode());
+
+            // Check if custom short code already exists
+            if (linkRepository.findByShortCode(request.getCustomShortCode()).isPresent()) {
+                log.warn("Custom short code already exists: {}", request.getCustomShortCode());
+                throw new IllegalArgumentException("Short code '" + request.getCustomShortCode() + "' is already in use");
+            }
+
             linkRepository.save(shortLink);
         } else {
             // Save first to get the auto-generated ID
@@ -45,6 +55,10 @@ public class LinkService {
         }
 
         log.info("Successfully created short link with code: {}", shortLink.getShortCode());
+
+        // Cache the short link in Redis
+        redisCacheService.cacheShortLink(shortLink);
+
         return new ShortLinkResponse(shortLink);
     }
 
@@ -89,12 +103,24 @@ public class LinkService {
 
     public URI getTarget(String code) {
         log.info("Looking up target URL for short code: {}", code);
+
+        // Check cache first
+        Optional<String> cachedUrl = redisCacheService.getLongUrlByShortCode(code);
+        if (cachedUrl.isPresent()) {
+            return URI.create(cachedUrl.get());
+        }
+
+        log.debug("Cache miss for short code: {}, checking database", code);
         long shortLinkId = Base62Encoder.decode(code);
         log.debug("Decoded short code to ID: {}", shortLinkId);
 
         try {
             ShortLink shortLink = linkRepository.findById(shortLinkId)
                     .orElseThrow(() -> new IllegalArgumentException("Link not found"));
+
+            // Cache the result for future requests
+            redisCacheService.cacheShortLink(shortLink);
+
             URI longUrl = URI.create(shortLink.getLongUrl());
             log.info("Found target URL: {} for short code: {}", longUrl, code);
             return longUrl;
