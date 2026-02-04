@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: shortme-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shortme-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shortme-app
+    environment:
+      # PostgreSQL remains on Supabase - use existing configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db.qpsstdeukjyrstzpwexw.supabase.co:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: pawsaf-5boMfi-dunxid
+      # Redis runs locally in Docker
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - shortme-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  shortme-network:
+    driver: bridge
