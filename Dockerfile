@@ -25,6 +25,8 @@ RUN java -Djarmode=layertools -jar target/*.jar extract
 # Stage 2: Runtime stage
 FROM eclipse-temurin:21-jre-jammy
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
 # Create non-root user for security
 RUN groupadd -r spring && useradd -r -g spring spring
 
