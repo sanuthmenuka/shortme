@@ -15,18 +15,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/sanuthmenuka/shortme:latest
     container_name: shortme-app
     environment:
-      # PostgreSQL remains on Supabase - use existing configuration
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db.qpsstdeukjyrstzpwexw.supabase.co:5432/postgres
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: pawsaf-5boMfi-dunxid
-      # Redis runs locally in Docker
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
     ports:
