@@ -7,6 +7,7 @@ import com.sanuth.shortme.repository.LinkRepository;
 import com.sanuth.shortme.util.Base62Encoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -32,26 +33,22 @@ public class LinkService {
 
         ShortLink shortLink = ShortLink.create(request);
 
-        // Use custom short code if provided, otherwise generate after saving
         if (request.getCustomShortCode() != null && !request.getCustomShortCode().trim().isEmpty()) {
             log.info("Using custom short code: {}", request.getCustomShortCode());
-
-            // Check if custom short code already exists
-            if (linkRepository.findByShortCode(request.getCustomShortCode()).isPresent()) {
-                log.warn("Custom short code already exists: {}", request.getCustomShortCode());
-                throw new IllegalArgumentException("Short code '" + request.getCustomShortCode() + "' is already in use");
-            }
-
         } else {
-            // Save first to get the auto-generated ID
+            // Save first to get the auto-generated ID, then derive short code from it
             shortLink = linkRepository.save(shortLink);
-            // Generate short code from ID using Base62
             String generatedCode = Base62Encoder.encode(shortLink.getId());
             log.info("Generated short code: {} from ID: {}", generatedCode, shortLink.getId());
             shortLink.setShortCode(generatedCode);
-            // Update with the generated short code
         }
-        shortLink=linkRepository.save(shortLink);
+
+        try {
+            shortLink = linkRepository.save(shortLink);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Short code '{}' already in use", shortLink.getShortCode());
+            throw new IllegalArgumentException("Short code '" + shortLink.getShortCode() + "' is already in use");
+        }
 
         log.info("Successfully created short link with code: {}", shortLink.getShortCode());
 
@@ -102,12 +99,6 @@ public class LinkService {
         } catch (URISyntaxException e) {
             log.warn("Validation failed: Invalid URL format - {}", e.getMessage());
             throw new IllegalArgumentException("Invalid URL format");
-        }
-
-        // Check for duplicates
-        if (linkRepository.findByLongUrl(url).isPresent()) {
-            log.warn("Validation failed: URL already exists: {}", url);
-            throw new IllegalArgumentException("URL already shortened");
         }
 
         log.debug("URL validation successful");

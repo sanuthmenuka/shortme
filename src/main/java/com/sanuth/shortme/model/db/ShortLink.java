@@ -13,6 +13,7 @@ public class ShortLink {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
+    @Column(unique = true)
     private String shortCode;
     private String longUrl;
     private Instant createdAt;
