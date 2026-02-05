@@ -42,7 +42,6 @@ public class LinkService {
                 throw new IllegalArgumentException("Short code '" + request.getCustomShortCode() + "' is already in use");
             }
 
-            linkRepository.save(shortLink);
         } else {
             // Save first to get the auto-generated ID
             shortLink = linkRepository.save(shortLink);
@@ -51,8 +50,8 @@ public class LinkService {
             log.info("Generated short code: {} from ID: {}", generatedCode, shortLink.getId());
             shortLink.setShortCode(generatedCode);
             // Update with the generated short code
-            shortLink = linkRepository.save(shortLink);
         }
+        shortLink=linkRepository.save(shortLink);
 
         log.info("Successfully created short link with code: {}", shortLink.getShortCode());
 
@@ -81,6 +80,20 @@ public class LinkService {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             url = "https://" + url;
             log.debug("Added https:// prefix to URL: {}", url);
+        }
+
+        // Reject double-prefixed URLs (e.g. "https://https://example.com")
+        String withoutScheme = url.startsWith("https://") ? url.substring(8) : url.substring(7);
+        if (withoutScheme.startsWith("http://") || withoutScheme.startsWith("https://")) {
+            log.warn("Validation failed: double protocol prefix detected");
+            throw new IllegalArgumentException("Invalid URL: double protocol prefix");
+        }
+
+        // Reject URLs with no valid host (must contain a dot, e.g. "example.com")
+        String host = withoutScheme.split("/")[0];
+        if (!host.contains(".")) {
+            log.warn("Validation failed: no valid domain in URL");
+            throw new IllegalArgumentException("Invalid URL: missing domain");
         }
 
         // Check if valid URL format

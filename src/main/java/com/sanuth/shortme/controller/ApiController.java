@@ -19,6 +19,11 @@ public class ApiController {
         this.linkService = linkService;
     }
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<String>> home(){
+        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("Success, Welcome to shortme"));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<ShortLinkResponse>> create(
             @Valid @RequestBody CreateShortLinkRequest request) {
