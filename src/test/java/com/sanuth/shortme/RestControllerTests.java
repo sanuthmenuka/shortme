@@ -6,6 +6,7 @@ import com.sanuth.shortme.model.db.LinkStatus;
 import com.sanuth.shortme.model.db.ShortLink;
 import com.sanuth.shortme.model.dto.ShortLinkResponse;
 import com.sanuth.shortme.service.LinkService;
+import com.sanuth.shortme.service.RedisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,8 @@ import java.net.URI;
 import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -30,6 +33,9 @@ public class RestControllerTests {
 
     @MockitoBean
     private LinkService linkService;
+
+    @MockitoBean
+    private RedisService redisService;
 
     private ShortLinkResponse sampleResponse;
 
@@ -260,23 +266,27 @@ public class RestControllerTests {
     // ---------------------------------------------------------------
 
     @Test
-    void redirect_validCode_returns302() throws Exception {
+    void redirect_validCode_returns302_andIncrementClick() throws Exception {
         when(linkService.getTarget("abc123"))
                 .thenReturn(URI.create("https://example.com"));
 
         mockMvc.perform(get("/abc123"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "https://example.com"));
+
+        verify(redisService).incrementClick("abc123");
     }
 
     @Test
-    void redirect_unknownCode_redirectsToErrorPage() throws Exception {
+    void redirect_unknownCode_redirectsToErrorPage_noClick() throws Exception {
         when(linkService.getTarget("missing"))
                 .thenReturn(URI.create("/error"));
 
         mockMvc.perform(get("/missing"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "/error"));
+
+        verify(redisService, never()).incrementClick("missing");
     }
 
     @Test
